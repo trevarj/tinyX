@@ -9,6 +9,7 @@ mod messaging;
 #[doc(hidden)]
 pub mod msg_area;
 mod notifier;
+mod spell_check;
 mod statusline;
 mod tab;
 mod termbox;
@@ -61,6 +62,9 @@ impl TUI {
 
         (TUI { inner }, rcv_ev)
     }
+
+    /// Do a spell check.
+    fn spell_check(&self) {}
 }
 
 async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receiver<()>) {
