@@ -18,6 +18,8 @@ use crate::{MsgSource, MsgTarget};
 use term_input::{Arrow, Event, Key};
 use termbox_simple::Termbox;
 
+use ispell;
+
 #[derive(Debug)]
 pub(crate) enum TUIRet {
     Abort,
@@ -62,6 +64,8 @@ pub(crate) struct TUI {
     statusline_visible: bool,
     /// Config file path
     config_path: Option<PathBuf>,
+
+    spell_checker: ispell::SpellChecker,
 }
 
 impl TUI {
@@ -780,6 +784,10 @@ impl TUI {
         }
 
         self.tb.present();
+    }
+
+    pub(crate) fn spell_check(&mut self)  {
+        self.tabs[self.active_idx].widget.spell_check();
     }
 
     ////////////////////////////////////////////////////////////////////////////

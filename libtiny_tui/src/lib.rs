@@ -64,7 +64,11 @@ impl TUI {
     }
 
     /// Do a spell check.
-    fn spell_check(&self) {}
+    fn spell_check(&self) {
+        if let Some(tui) = self.inner.upgrade() {
+            tui.borrow_mut().spell_check();
+        }
+    }
 }
 
 async fn sigwinch_handler(tui: Weak<RefCell<tui::TUI>>, rcv_abort: mpsc::Receiver<()>) {

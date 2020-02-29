@@ -62,6 +62,10 @@ impl TextField {
         }
     }
 
+    pub(crate) fn get_buffer(&self) -> String {
+        self.buffer.iter().collect()
+    }
+
     pub(crate) fn resize(&mut self, width: i32) {
         self.width = width;
         let cursor = self.cursor;

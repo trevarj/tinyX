@@ -94,6 +94,10 @@ impl MessagingUI {
         }
     }
 
+    pub(crate) fn spell_check(&mut self) {
+        let content = self.input_field.get_buffer();
+    }
+
     pub(crate) fn set_nick(&mut self, nick: String) {
         self.current_nick = Some(nick);
         // update text field size
