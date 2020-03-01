@@ -22,6 +22,7 @@ mod widget;
 #[cfg(test)]
 mod tests;
 
+use crate::spell_check::SpellChecker;
 pub use crate::tab::TabStyle;
 pub use libtiny_ui::*;
 
@@ -30,6 +31,7 @@ use futures::stream::StreamExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::{Rc, Weak};
+use std::time::Duration;
 use term_input::Input;
 use time::Tm;
 use tokio::signal::unix::{signal, SignalKind};
@@ -48,6 +50,16 @@ impl TUI {
     pub fn run(config_path: PathBuf) -> (TUI, mpsc::Receiver<Event>) {
         let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
         let inner = Rc::downgrade(&tui);
+
+        let spell_checker_task = SpellChecker::new(
+            Duration::from_secs(3),
+            TUI {
+                inner: inner.clone(),
+            },
+        );
+        if let Some(tui) = inner.upgrade() {
+            tui.borrow_mut().set_spell_checker_task(spell_checker_task);
+        }
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);
 

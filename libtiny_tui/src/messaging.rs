@@ -94,8 +94,18 @@ impl MessagingUI {
         }
     }
 
-    pub(crate) fn spell_check(&mut self) {
+    pub(crate) fn spell_check(&mut self, spell_checker: &mut ispell::SpellChecker) {
+        eprintln!("Spell checking...");
         let content = self.input_field.get_buffer();
+        match spell_checker.check(&content) {
+            Err(err) => {
+                eprintln!("Error when spell checking: {}", err);
+                eprintln!("Input was: {:?}", content);
+            }
+            Ok(errs) => {
+                eprintln!("Spell check results: {:?}", errs);
+            }
+        }
     }
 
     pub(crate) fn set_nick(&mut self, nick: String) {

@@ -10,6 +10,7 @@ use time::Tm;
 use crate::config::{parse_config, Colors, Config, Style};
 use crate::messaging::{MessagingUI, Timestamp};
 use crate::notifier::Notifier;
+use crate::spell_check::SpellChecker;
 use crate::statusline::{draw_statusline, statusline_visible};
 use crate::tab::{Tab, TabStyle};
 use crate::widget::WidgetRet;
@@ -66,6 +67,7 @@ pub(crate) struct TUI {
     config_path: Option<PathBuf>,
 
     spell_checker: ispell::SpellChecker,
+    spell_checker_task: Option<SpellChecker>,
 }
 
 impl TUI {
@@ -103,6 +105,8 @@ impl TUI {
             show_statusline: false,
             statusline_visible: statusline_visible(width, height),
             config_path,
+            spell_checker: ispell::SpellLauncher::new().aspell().launch().unwrap(),
+            spell_checker_task: None,
         };
 
         // Init "mentions" tab. This needs to happen right after creating the TUI to be able to
@@ -786,8 +790,14 @@ impl TUI {
         self.tb.present();
     }
 
-    pub(crate) fn spell_check(&mut self)  {
-        self.tabs[self.active_idx].widget.spell_check();
+    pub(crate) fn spell_check(&mut self) {
+        self.tabs[self.active_idx]
+            .widget
+            .spell_check(&mut self.spell_checker);
+    }
+
+    pub(crate) fn set_spell_checker_task(&mut self, spell_checker: SpellChecker) {
+        self.spell_checker_task = Some(spell_checker);
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -807,11 +817,17 @@ impl TUI {
     }
 
     pub(crate) fn next_tab(&mut self) {
+        if let Some(task) = self.spell_checker_task.as_mut() {
+            task.reset();
+        }
         self.next_tab_();
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
 
     pub(crate) fn prev_tab(&mut self) {
+        if let Some(task) = self.spell_checker_task.as_mut() {
+            task.reset();
+        }
         self.prev_tab_();
         self.tabs[self.active_idx].set_style(TabStyle::Normal);
     }
@@ -884,6 +900,9 @@ impl TUI {
             }
         }
         if next_idx != self.active_idx {
+            if let Some(task) = self.spell_checker_task.as_mut() {
+                task.reset();
+            }
             self.select_tab(next_idx);
         }
     }

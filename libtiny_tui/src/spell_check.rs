@@ -29,28 +29,30 @@ impl SpellChecker {
         let tui = self.tui.clone();
         let delay = self.delay;
         let (snd_stop, rcv_stop) = mpsc::channel(1);
+        self.snd_stop = Some(snd_stop);
+
         spawn_local(async move {
-            let timer = tokio::time::delay_for(delay);
-
-            let mut timer_fused = timer.fuse();
             let mut rcv_stop_fused = rcv_stop.fuse();
+            loop {
+                let timer = tokio::time::delay_for(delay);
 
-            select! {
-                () = timer_fused => {
-                    tui.spell_check();
-                }
-                _ = rcv_stop_fused.next() => {
-                    return;
+                let mut timer_fused = timer.fuse();
+
+                select! {
+                    () = timer_fused => {
+                        tui.spell_check();
+                    }
+                    _ = rcv_stop_fused.next() => {
+                        return;
+                    }
                 }
             }
         });
-
-        self.snd_stop = Some(snd_stop);
     }
 
     /// Stop the spell checker timer.
     pub fn stop(&mut self) {
-        if let Some(mut snd_stop) = self.snd_stop.as_mut() {
+        if let Some(snd_stop) = self.snd_stop.as_mut() {
             let _ = snd_stop.try_send(());
         }
     }
