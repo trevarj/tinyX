@@ -338,19 +338,33 @@ impl Termbox {
 
     // TODO: parameters should be u32
     pub fn change_cell(&mut self, x: i32, y: i32, ch: char, fg: u16, bg: u16) {
-        debug_assert!(x >= 0);
-        debug_assert!(y >= 0);
-        let mut cell =
-            &mut self.back_buffer.cells[(y as usize) * (self.term_width as usize) + (x as usize)];
-        cell.ch = ch;
-        cell.fg = fg;
-        cell.bg = bg;
+        // debug_assert!(x >= 0);
+        // debug_assert!(y >= 0);
+        if self.back_buffer.cells.len() > 0 {
+            let y_times_width = (y as usize).overflowing_mul(self.term_width as usize);
+            let index = y_times_width.0.overflowing_add(x as usize);
+            if !y_times_width.1 && !index.1 {
+                let cell =
+                &mut self.back_buffer.cells.get_mut(index.0);
+                match cell {
+                    Some(cell) => {
+                        cell.ch = ch;
+                        cell.fg = fg;
+                        cell.bg = bg;
+                    },
+                    None => {},
+                }
+                
+            }
+            
+        }
+        
     }
 
     fn flush_output_buffer(&mut self) {
         // self.total_flushed += self.output_buffer.len() as u64;
         if let Some(ref mut tty) = self.tty {
-            tty.write_all(&self.output_buffer).unwrap();
+            tty.write_all(&self.output_buffer).unwrap_or_default();
         }
         self.output_buffer.clear();
     }

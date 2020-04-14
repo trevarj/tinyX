@@ -635,20 +635,20 @@ fn draw_line_scroll(
     tb: &mut Termbox,
     colors: &Colors,
     line: &[char],
-    pos_x: i32,
-    pos_y: i32,
-    width: i32,
-    cursor: i32,
-    scroll: i32,
+    pos_x: u32,
+    pos_y: u32,
+    width: u32,
+    cursor: u32,
+    scroll: u32,
 ) {
     let slice: &[char] = &line[scroll as usize..min(line.len(), (scroll + width) as usize)];
-    termbox::print_chars(tb, pos_x, pos_y, colors.user_msg, slice.iter().cloned());
+    termbox::print_chars(tb, pos_x as i32, pos_y as i32, colors.user_msg, slice.iter().cloned());
     // On my terminal the cursor is only shown when there's a character
     // under it.
     if cursor as usize >= line.len() {
         tb.change_cell(
-            pos_x + cursor - scroll,
-            pos_y,
+            (pos_x + cursor - scroll) as i32,
+            pos_y as i32,
             ' ',
             colors.cursor.fg,
             colors.cursor.bg,
@@ -674,11 +674,11 @@ fn draw_line(
             tb,
             colors,
             line,
-            pos_x,
-            pos_y,
-            width,
-            cursor,
-            scroll.unwrap_or(0),
+            pos_x.max(0) as u32,
+            pos_y.max(0) as u32,
+            width.max(0) as u32,
+            cursor.max(0) as u32,
+            scroll.unwrap_or(0) as u32,
         );
     } else {
         // --- vert overflow ---
