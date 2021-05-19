@@ -6,7 +6,6 @@ use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
-use time::Tm;
 
 use crate::config::{parse_config, Colors, Config, Style};
 use crate::editor;
@@ -14,11 +13,14 @@ use crate::messaging::{MessagingUI, Timestamp};
 use crate::msg_area::Layout;
 use crate::notifier::Notifier;
 use crate::tab::Tab;
+use crate::utils::parse_log_file;
 use crate::widget::WidgetRet;
+
+pub use termbox_simple::{CellBuf, Termbox};
 
 use libtiny_common::{ChanNameRef, MsgSource, MsgTarget, TabStyle};
 use term_input::{Arrow, Event, Key};
-pub use termbox_simple::{CellBuf, Termbox};
+use time::Tm;
 
 #[derive(Debug)]
 pub(crate) enum TUIRet {
@@ -297,6 +299,7 @@ impl TUI {
                     scrollback,
                     layout,
                     max_nick_length,
+                    ..
                 }) => {
                     self.set_colors(colors);
                     self.scrollback = scrollback.max(1);
@@ -365,17 +368,21 @@ impl TUI {
             ret
         };
 
+        let mut widget = MessagingUI::new(
+            self.width,
+            self.height - 1,
+            status,
+            self.scrollback,
+            self.msg_layout,
+        );
+
+        parse_log_file(&self.config_path, &src, &mut widget);
+
         self.tabs.insert(
             idx,
             Tab {
                 alias,
-                widget: MessagingUI::new(
-                    self.width,
-                    self.height - 1,
-                    status,
-                    self.scrollback,
-                    self.msg_layout,
-                ),
+                widget,
                 src,
                 style: TabStyle::Normal,
                 switch,

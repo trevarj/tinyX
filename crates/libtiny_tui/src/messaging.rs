@@ -42,7 +42,7 @@ pub(crate) struct MessagingUI {
 pub(crate) const MSG_NICK_SUFFIX_LEN: usize = 2;
 
 /// Like `time::Tm`, but we only care about hour and minute parts.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Default, PartialEq, Eq, Clone, Copy)]
 pub(crate) struct Timestamp {
     hour: i32,
     min: i32,

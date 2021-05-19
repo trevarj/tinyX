@@ -13,6 +13,8 @@ use libtiny_common::{ChanName, ChanNameRef, MsgTarget};
 #[macro_use]
 extern crate log;
 
+const LOG_DATE_FMT: &str = "%H:%M:%S";
+
 #[derive(Clone)]
 pub struct Logger {
     inner: Rc<RefCell<LoggerInner>>,
@@ -240,7 +242,7 @@ impl LoggerInner {
     ) {
         self.apply_to_target(target, |fd: &mut File, report_err: &dyn Fn(String)| {
             let io_ret = if is_action {
-                writeln!(fd, "[{}] {} {}", strf(&ts), sender, msg)
+                writeln!(fd, "[{}] **{} {}", strf(&ts), sender, msg)
             } else {
                 writeln!(fd, "[{}] {}: {}", strf(&ts), sender, msg)
             };
@@ -382,9 +384,9 @@ impl LoggerInner {
 }
 
 fn now() -> String {
-    time::strftime("%H:%M:%S", &time::now()).unwrap()
+    time::strftime(LOG_DATE_FMT, &time::now()).unwrap()
 }
 
 fn strf(tm: &Tm) -> String {
-    time::strftime("%H:%M:%S", tm).unwrap()
+    time::strftime(LOG_DATE_FMT, tm).unwrap()
 }

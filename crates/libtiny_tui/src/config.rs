@@ -5,7 +5,7 @@ use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub use termbox_simple::*;
 
@@ -21,6 +21,8 @@ pub(crate) struct Config {
 
     #[serde(default = "default_max_nick_length")]
     pub(crate) max_nick_length: usize,
+
+    pub(crate) log_dir: Option<PathBuf>,
 }
 
 fn default_max_nick_length() -> usize {

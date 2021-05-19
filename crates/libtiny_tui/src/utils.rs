@@ -55,7 +55,15 @@ pub(crate) fn is_nick_char(c: char) -> bool {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::PathBuf;
 use std::{iter::Peekable, str::Chars};
+
+use libtiny_common::MsgSource;
+
+use crate::config::parse_config;
+use crate::messaging::{MessagingUI, Timestamp};
 
 /// Parse at least one, at most two digits. Does not consume the iterator when
 /// result is `None`.
@@ -141,6 +149,58 @@ pub(crate) fn translate_irc_control_chars(
 pub(crate) fn remove_irc_control_chars(str: &str) -> String {
     fn push_color(_ret: &mut String, _fg: u8, _bg: Option<u8>) {}
     translate_irc_control_chars(str, push_color)
+}
+
+/// Parses messages from a log file, if it exists, and adds it to the MessagingUI
+pub(crate) fn parse_log_file(
+    config_path: &Option<PathBuf>,
+    src: &MsgSource,
+    widget: &mut MessagingUI,
+) {
+    if let Some(config_path) = config_path {
+        match parse_config(config_path) {
+            Ok(config) if config.log_dir.is_some() => {
+                // try to find log for this tab
+                let file_name = match &src {
+                    MsgSource::Serv { serv } => format!("{}.txt", serv),
+                    MsgSource::Chan { serv, chan } => {
+                        format!("{}_{}.txt", serv, chan.display())
+                    }
+                    MsgSource::User { serv, nick } => {
+                        format!("{}_{}.txt", serv, nick)
+                    }
+                };
+                let log_dir = config.log_dir.unwrap();
+                let file_path = log_dir.join(file_name);
+
+                // try to open log file for this tab
+                if let Ok(file) = File::open(file_path) {
+                    let reader = BufReader::new(file);
+                    for line in reader.lines() {
+                        let line = line.unwrap_or_default();
+                        let splits: Vec<&str> = line.splitn(3, ' ').collect();
+                        if let Some(sender) = splits.get(1) {
+                            let ts = || {
+                                time::strptime(splits[0], "[%H:%M:%S]")
+                                    .map_or_else(|_| Timestamp::default(), |tm| tm.into())
+                            };
+                            if sender.contains("**") {
+                                // emote
+                                let sender = sender.trim_start_matches("**");
+                                widget.add_privmsg(sender, &splits[2], ts(), false, true);
+                            } else if sender.contains(":") {
+                                // regular message
+                                let sender = sender.trim_end_matches(':');
+                                widget.add_privmsg(sender, &splits[2], ts(), false, false);
+                            }
+                        }
+                    }
+                }
+            }
+            Ok(_) => {}
+            Err(err) => widget.add_client_err_msg(&err.to_string()),
+        }
+    }
 }
 
 #[test]
