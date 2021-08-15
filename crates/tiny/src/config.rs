@@ -41,7 +41,6 @@ pub(crate) struct Server {
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
-    // #[serde(default, deserialize_with = "deser_chans")]
     pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
