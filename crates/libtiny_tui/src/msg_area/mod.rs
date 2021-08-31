@@ -1,4 +1,5 @@
 pub(crate) mod line;
+mod scrollbar;
 
 use std::collections::VecDeque;
 use std::{cmp::max, mem, str};
@@ -101,11 +102,18 @@ impl MsgArea {
         // How many visible lines to skip
         let mut skip = self.scroll.scroll;
 
+        // Check to make room for the scrollbar
+        let width = if skip != 0 {
+            self.width - 1
+        } else {
+            self.width
+        };
+
         // Draw lines in reverse order
         let mut line_idx = (self.lines.len() as i32) - 1;
         while line_idx >= 0 && row >= pos_y {
             let line = &mut self.lines[line_idx as usize];
-            let line_height = line.rendered_height(self.width);
+            let line_height = line.rendered_height(width);
             debug_assert!(line_height > 0);
 
             if skip >= line_height {
@@ -136,6 +144,15 @@ impl MsgArea {
 
         // Set index of the current top-most line, +1 since last loop subtracted
         self.scroll.line_idx = (line_idx + 1) as usize;
+
+        scrollbar::draw(
+            tb,
+            colors,
+            self.scroll.scroll,
+            self.total_visible_lines(),
+            self.width - 1,
+            self.height,
+        );
     }
 }
 
