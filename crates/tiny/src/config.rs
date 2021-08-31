@@ -1,3 +1,4 @@
+use libtiny_tui::config::Chan;
 use serde::{Deserialize, Deserializer};
 use std::fs;
 use std::fs::File;
@@ -40,8 +41,7 @@ pub(crate) struct Server {
     pub(crate) nicks: Vec<String>,
 
     /// Channels to automatically join.
-    #[serde(default)]
-    pub(crate) join: Vec<String>,
+    pub(crate) join: Vec<Chan>,
 
     /// NickServ identification password. Used on connecting to the server and nick change.
     pub(crate) nickserv_ident: Option<String>,
@@ -214,6 +214,9 @@ fn get_default_config_yaml() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use libtiny_common::ChanName;
+    use libtiny_tui::config::TabConfig;
+    use libtiny_tui::Notifier;
     use serde_yaml;
 
     #[test]
@@ -224,7 +227,13 @@ mod tests {
                 panic!();
             }
             Ok(Config { servers, .. }) => {
-                assert_eq!(servers[0].join, vec!["#tiny".to_owned()]);
+                assert_eq!(
+                    servers[0].join,
+                    vec![Chan {
+                        name: ChanName::new("#tiny".to_string()),
+                        config: TabConfig::default()
+                    }]
+                );
                 assert_eq!(servers[0].tls, true);
             }
         }
@@ -272,6 +281,24 @@ mod tests {
         assert_eq!(
             &errors[3],
             "'realname' can't be empty, please update 'realname' field of 'my_server'"
+        );
+    }
+
+    #[test]
+    fn parse_chan_with_args() {
+        let config: Config = serde_yaml::from_str(
+            &get_default_config_yaml().replace("#tiny", "#tiny -ignore -notify off"),
+        )
+        .expect("parsed config");
+        assert_eq!(
+            config.servers[0].join,
+            vec![Chan {
+                name: ChanName::new("#tiny".to_string()),
+                config: TabConfig {
+                    ignore: Some(true),
+                    notifier: Some(Notifier::Off)
+                }
+            }]
         );
     }
 }

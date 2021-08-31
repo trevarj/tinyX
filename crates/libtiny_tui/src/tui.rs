@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::str::{self, SplitWhitespace};
 use time::Tm;
 
-use crate::config::{parse_config, Colors, Config, Style};
+use crate::config::{parse_config, Colors, Config, Style, TabConfig};
 use crate::editor;
 use crate::key_map::{KeyAction, KeyMap};
 use crate::messaging::{MessagingUI, Timestamp};
@@ -295,7 +295,7 @@ impl TUI {
         }
     }
 
-    pub(crate) fn reload_config(&mut self) {
+    pub(crate) fn load_config(&mut self) -> Option<Config> {
         if let Some(ref config_path) = self.config_path {
             match parse_config(config_path) {
                 Err(err) => {
@@ -303,32 +303,46 @@ impl TUI {
                         &format!("Can't parse TUI config: {:?}", err),
                         &MsgTarget::CurrentTab,
                     );
+                    None
                 }
-                Ok(Config {
-                    colors,
-                    scrollback,
-                    layout,
-                    max_nick_length,
-                    key_map,
-                }) => {
-                    self.set_colors(colors);
-                    self.scrollback = scrollback.max(1);
-                    self.key_map.load(&key_map.unwrap_or_default());
-                    if let Some(layout) = layout {
-                        let layout = match layout {
-                            crate::config::Layout::Compact => Layout::Compact,
-                            crate::config::Layout::Aligned => Layout::Aligned {
-                                max_nick_len: max_nick_length,
-                            },
-                        };
-                        self.msg_layout = layout;
-                        self.tabs
-                            .iter_mut()
-                            .for_each(|t| t.widget.set_layout(layout));
-                    }
-                }
+                Ok(config) => Some(config),
+            }
+        } else {
+            None
+        }
+    }
+
+    fn apply_config(&mut self, config: Option<Config>) {
+        if let Some(config) = config {
+            let Config {
+                colors,
+                scrollback,
+                max_nick_length,
+                key_map,
+                layout,
+                ..
+            } = config;
+            self.set_colors(colors);
+            self.scrollback = scrollback.max(1);
+            self.key_map.load(&key_map.unwrap_or_default());
+            if let Some(layout) = layout {
+                let layout = match layout {
+                    crate::config::Layout::Compact => Layout::Compact,
+                    crate::config::Layout::Aligned => Layout::Aligned {
+                        max_nick_len: max_nick_length,
+                    },
+                };
+                self.msg_layout = layout;
+                self.tabs
+                    .iter_mut()
+                    .for_each(|t| t.widget.set_layout(layout));
             }
         }
+    }
+
+    fn reload_config(&mut self) {
+        let config = self.load_config();
+        self.apply_config(config);
     }
 
     fn set_colors(&mut self, colors: Colors) {
@@ -337,14 +351,7 @@ impl TUI {
         self.colors = colors;
     }
 
-    fn new_tab(
-        &mut self,
-        idx: usize,
-        src: MsgSource,
-        status: bool,
-        notifier: Notifier,
-        alias: Option<String>,
-    ) {
+    fn new_tab(&mut self, idx: usize, src: MsgSource, alias: Option<String>) {
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
         for tab in &self.tabs {
             if let Some(key) = tab.switch {
@@ -379,6 +386,38 @@ impl TUI {
             ret
         };
 
+        // Get tab configs for the type of tab being created
+        let TabConfig { ignore, notifier } = if let Some(config) = self.load_config() {
+            match &src {
+                MsgSource::Serv { serv } => config.server_tab_configs(serv),
+                MsgSource::Chan { serv, chan } => {
+                    let tab_configs = config.chan_tab_configs(serv, chan);
+                    // Prioritize config file but fallback to current server tab settings (when Defaults are not set)
+                    let server_tab_config = self
+                        .tabs
+                        .iter()
+                        .find_map(|tab| {
+                            if tab.src.serv_name() == serv {
+                                Some(TabConfig {
+                                    ignore: Some(!tab.widget.is_showing_status()),
+                                    notifier: Some(tab.notifier),
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                        .expect("Creating a channel or user tab, but the server tab doesn't exist");
+                    server_tab_config.merge(Some(&tab_configs))
+                }
+                MsgSource::User { .. } => config.user_tab_configs(),
+            }
+        } else {
+            // Config could not be parsed
+            TabConfig::default()
+        };
+        let status = !ignore.unwrap_or(false);
+        let notifier = notifier.unwrap_or_default();
+
         self.tabs.insert(
             idx,
             Tab {
@@ -408,12 +447,6 @@ impl TUI {
                     MsgSource::Serv {
                         serv: serv.to_owned(),
                     },
-                    true,
-                    if cfg!(feature = "desktop-notifications") {
-                        Notifier::Mentions
-                    } else {
-                        Notifier::Off
-                    },
                     alias,
                 );
                 Some(tab_idx)
@@ -442,17 +475,6 @@ impl TUI {
                     self.new_chan_tab(serv, chan)
                 }
                 Some(serv_tab_idx) => {
-                    let mut status_val: bool = true;
-                    let mut notifier: Option<Notifier> = None;
-                    for tab in &self.tabs {
-                        if let MsgSource::Serv { serv: ref serv_ } = tab.src {
-                            if serv == serv_ {
-                                status_val = tab.widget.is_showing_status();
-                                notifier = Some(tab.notifier);
-                                break;
-                            }
-                        }
-                    }
                     let tab_idx = serv_tab_idx + 1;
                     self.new_tab(
                         tab_idx,
@@ -460,8 +482,6 @@ impl TUI {
                             serv: serv.to_owned(),
                             chan: chan.to_owned(),
                         },
-                        status_val,
-                        notifier.expect("Creating a channel tab, but the server tab doesn't exist"),
                         None,
                     );
                     if self.active_idx >= tab_idx {
@@ -502,8 +522,6 @@ impl TUI {
                             serv: serv.to_owned(),
                             nick: nick.to_owned(),
                         },
-                        true,
-                        Notifier::Messages,
                         None,
                     );
                     if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
@@ -1234,10 +1252,21 @@ impl TUI {
         });
     }
 
+    pub(crate) fn set_tab_config(&mut self, config: TabConfig, target: &MsgTarget) {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
+            if let Some(ignore) = config.ignore {
+                tab.widget.set_or_toggle_status(Some(!ignore));
+            }
+            if let Some(notifier) = config.notifier {
+                tab.notifier = notifier;
+            }
+        });
+    }
+
     /// An error message coming from Tiny, probably because of a command error
     /// etc. Those are not timestamped and not logged.
     pub(crate) fn add_client_err_msg(&mut self, msg: &str, target: &MsgTarget) {
-        self.apply_to_target(target, false, &|tab: &mut Tab, _| {
+        self.apply_to_target(target, true, &|tab: &mut Tab, _| {
             tab.widget.add_client_err_msg(msg);
         });
     }
@@ -1364,11 +1393,11 @@ impl TUI {
                 }
             }
             self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_ignore(Some(!status_val));
+                tab.widget.set_or_toggle_status(Some(!status_val));
             });
         } else {
             self.apply_to_target(target, false, &|tab: &mut Tab, _| {
-                tab.widget.set_or_toggle_ignore(None);
+                tab.widget.set_or_toggle_status(None);
             });
         }
     }

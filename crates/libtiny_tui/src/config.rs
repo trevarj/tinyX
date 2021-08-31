@@ -1,18 +1,25 @@
 // To see how color numbers map to actual colors in your terminal run
 // `cargo run --example colors`. Use tab to swap fg/bg colors.
 
+use libtiny_common::{ChanName, ChanNameRef};
 use serde::de::{self, Deserializer, MapAccess, Visitor};
 use serde::Deserialize;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::str::FromStr;
 
-pub use termbox_simple::*;
+pub(crate) use termbox_simple::*;
 
 use crate::key_map::KeyMap;
+use crate::notifier::Notifier;
 
-#[derive(Deserialize)]
+#[derive(Debug, Default, Deserialize)]
 pub(crate) struct Config {
+    pub(crate) servers: Vec<Server>,
+
+    pub(crate) defaults: Defaults,
+
     #[serde(default)]
     pub(crate) colors: Colors,
 
@@ -28,6 +35,171 @@ pub(crate) struct Config {
     pub(crate) key_map: Option<KeyMap>,
 }
 
+impl Config {
+    /// Gets tab configs for `server`
+    /// Prioritizing configs under the server or using defaults
+    pub(crate) fn server_tab_configs(&self, server: &str) -> TabConfig {
+        let server_config = self.servers.iter().find_map(|s| {
+            if s.addr == server {
+                Some(&s.configs)
+            } else {
+                None
+            }
+        });
+        self.defaults.tab_configs.merge(server_config)
+    }
+
+    /// Gets tab configs for `chan` in `server`
+    /// Prioritizing configs under the chan, then the server, then the defaults
+    pub(crate) fn chan_tab_configs(&self, server: &str, chan: &ChanNameRef) -> TabConfig {
+        let tab_config = self
+            .servers
+            .iter()
+            .find(|s| s.addr == server)
+            .and_then(|s| {
+                s.join.iter().find_map(|c| {
+                    if &c.name == chan {
+                        Some(c.config)
+                    } else {
+                        None
+                    }
+                })
+            });
+        self.server_tab_configs(server).merge(tab_config.as_ref())
+    }
+
+    pub(crate) fn user_tab_configs(&self) -> TabConfig {
+        TabConfig {
+            ignore: Some(false),
+            notifier: Some(Notifier::Messages),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq)]
+pub(crate) struct Server {
+    pub(crate) addr: String,
+    pub(crate) join: Vec<Chan>,
+    #[serde(flatten)]
+    pub(crate) configs: TabConfig,
+}
+
+#[derive(Debug, Default, Deserialize, PartialEq)]
+pub(crate) struct Defaults {
+    #[serde(flatten)]
+    pub(crate) tab_configs: TabConfig,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct Chan {
+    pub name: ChanName,
+    pub config: TabConfig,
+}
+
+impl<'de> Deserialize<'de> for Chan {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct ChanVisitor;
+
+        impl<'de> Visitor<'de> for ChanVisitor {
+            type Value = Chan;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                write!(formatter, "a channel name with arguments")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                Chan::from_str(v).map_err(de::Error::custom)
+            }
+        }
+        deserializer.deserialize_str(ChanVisitor)
+    }
+}
+
+impl FromStr for Chan {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        // Make sure channel starts with '#'
+        let s = if !s.starts_with('#') {
+            format!("#{}", s)
+        } else {
+            s.to_string()
+        };
+        // Try to split chan name and args
+        match s.split_once(" ") {
+            // with args
+            Some((name, args)) => {
+                let configs = TabConfig::from_str(args)?;
+                Ok(Chan {
+                    name: ChanName::new(name.to_string()),
+                    config: configs,
+                })
+            }
+            // chan name only
+            None => Ok(Chan {
+                name: ChanName::new(s),
+                config: TabConfig::default(),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, Deserialize, PartialEq)]
+pub struct TabConfig {
+    /// `true` if tab is ignoring join/part messages
+    #[serde(default)]
+    pub ignore: Option<bool>,
+    /// Notification setting for tab
+    #[serde(default)]
+    pub notifier: Option<Notifier>,
+}
+
+impl TabConfig {
+    /// Overwrites `self`'s values with `o`'s if `o`'s are `Some`
+    pub(crate) fn merge(&self, o: Option<&TabConfig>) -> TabConfig {
+        if let Some(o) = o {
+            TabConfig {
+                ignore: o.ignore.or(self.ignore),
+                notifier: o.notifier.or(self.notifier),
+            }
+        } else {
+            self.to_owned()
+        }
+    }
+}
+
+impl FromStr for TabConfig {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let config = s
+            .split('-')
+            .filter_map(|arg| (!arg.is_empty()).then(|| arg.trim()))
+            .try_fold(TabConfig::default(), |mut tc, arg| match arg {
+                // flag
+                "ignore" => {
+                    tc.ignore = Some(true);
+                    Ok(tc)
+                }
+                arg => match arg.split_once(' ') {
+                    // arg with parameter
+                    Some(("notify", val)) => {
+                        tc.notifier = Some(Notifier::from_str(val)?);
+                        Ok(tc)
+                    }
+                    _ => Err(format!("Unexpected argument: {:?}", arg)),
+                },
+            })?;
+        Ok(config)
+    }
+}
+
 fn default_max_nick_length() -> usize {
     12
 }
@@ -41,7 +213,7 @@ pub struct Style {
     pub bg: u16,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum Layout {
     Compact,
