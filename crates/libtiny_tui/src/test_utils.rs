@@ -31,9 +31,11 @@ pub fn expect_screen(
     let mut screen_filtered = String::with_capacity(screen.len());
 
     let mut in_screen = false;
-    for c in screen.chars() {
+    let mut screen_iter = screen.chars().peekable();
+
+    while let Some(c) = screen_iter.next() {
         if in_screen {
-            if c == '|' {
+            if c == '|' && screen_iter.peek().map_or(false, |c| *c == '\n') {
                 screen_filtered.push('\n');
                 in_screen = false;
             } else {
@@ -43,6 +45,7 @@ pub fn expect_screen(
             in_screen = true;
         }
     }
+
     let _ = screen_filtered.pop(); // pop the last '\n'
 
     let found = buffer_str(front_buffer, w, h);

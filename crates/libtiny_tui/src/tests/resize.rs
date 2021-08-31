@@ -52,11 +52,11 @@ fn test_resize_recalc_scroll() {
     // should be at the top of message after resize
     #[rustfmt::skip]
     let screen2 =
-       "|00:00 osa1: s   |
-        |1111 1111 1111  |
-        |1111 1111 1111  |
-        |1111 1111 1111  |
-        |1111 1111 1111  |
+       "|00:00 osa1: s  ||
+        |1111 1111 1111 ||
+        |1111 1111 1111 ||
+        |1111 1111 1111 ||
+        |1111 1111 1111 ||
         |                |
         |< #chan         |";
 
@@ -129,15 +129,15 @@ fn test_resize_scroll_stick_to_top() {
 
     #[rustfmt::skip]
     let screen2 =
-       "|osa1: line5       |
-        |osa1: line6       |
-        |osa1: line7       |
-        |osa1: line8       |
-        |osa1: line9       |
-        |osa1: line10      |
-        |osa1: line11      |
-        |osa1: line12      |
-        |osa1: line13      |
+       "|osa1: line5      ||
+        |osa1: line6      ||
+        |osa1: line7      ||
+        |osa1: line8      ||
+        |osa1: line9      ||
+        |osa1: line10     ||
+        |osa1: line11     ||
+        |osa1: line12     ||
+        |osa1: line13     ||
         |                  |
         |< #chan           |";
     expect_screen(screen2, &tui.get_front_buffer(), 18, 11, Location::caller());
