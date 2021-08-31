@@ -48,8 +48,8 @@ pub struct TUI {
 }
 
 impl TUI {
-    pub fn run(config_path: PathBuf) -> (TUI, mpsc::Receiver<Event>) {
-        let tui = Rc::new(RefCell::new(tui::TUI::new(config_path)));
+    pub fn run(config_path: PathBuf, help_msgs: &[String]) -> (TUI, mpsc::Receiver<Event>) {
+        let tui = Rc::new(RefCell::new(tui::TUI::new(config_path, help_msgs)));
         let inner = Rc::downgrade(&tui);
 
         let (snd_ev, rcv_ev) = mpsc::channel(10);
@@ -143,7 +143,9 @@ async fn input_handler<S>(
                     debug!("RecvError while waiting editor response: {:?}", recv_error);
                 }
                 Ok(editor_ret) => {
-                    if let Some((lines, from)) = tui.borrow_mut().handle_editor_result(editor_ret) {
+                    if let Some((lines, Some(from))) =
+                        tui.borrow_mut().handle_editor_result(editor_ret)
+                    {
                         debug!("editor ret: {:?}", lines);
                         snd_ev
                             .try_send(Event::Lines {
@@ -266,6 +268,7 @@ impl TUI {
     pub fn current_tab(&self) -> Option<MsgSource> {
         self.inner
             .upgrade()
-            .map(|tui| tui.borrow().current_tab().clone())
+            .map(|tui| tui.borrow().current_tab().cloned())
+            .flatten()
     }
 }

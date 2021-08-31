@@ -103,7 +103,8 @@ fn run(
 
     local.block_on(&runtime, async move {
         // Create TUI task
-        let (tui, rcv_tui_ev) = TUI::run(config_path.clone());
+        let help_msgs = cmd::help_msgs();
+        let (tui, rcv_tui_ev) = TUI::run(config_path.clone(), &help_msgs);
         tui.draw();
 
         // Create logger

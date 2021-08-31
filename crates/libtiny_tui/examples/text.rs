@@ -20,7 +20,7 @@ fn main() {
     let tab = MsgTarget::Server { serv: "mentions" };
 
     local.block_on(&runtime, async move {
-        let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"));
+        let (tui, rcv_ev) = TUI::run(PathBuf::from("../tiny/config.yml"), &[]);
 
         let mut text = String::new();
         let mut file = File::open("test/lipsum.txt").unwrap();

@@ -94,6 +94,9 @@ pub struct TUI {
 
     key_map: KeyMap,
 
+    /// List of help messages for client commands
+    client_help: Vec<String>,
+
     /// Config file path
     config_path: Option<PathBuf>,
 }
@@ -108,16 +111,16 @@ pub(crate) enum CmdResult {
 }
 
 impl TUI {
-    pub(crate) fn new(config_path: PathBuf) -> TUI {
+    pub(crate) fn new(config_path: PathBuf, help_msgs: &[String]) -> TUI {
         let tb = Termbox::init().unwrap(); // TODO: check errors
-        TUI::new_tb(Some(config_path), tb)
+        TUI::new_tb(Some(config_path), tb, help_msgs)
     }
 
     /// Create a test instance. Does not render to the screen, just updates the termbox buffer.
     /// Useful for testing rendering. See also [`get_front_buffer`](TUI::get_front_buffer).
     pub fn new_test(w: u16, h: u16) -> TUI {
         let tb = Termbox::init_test(w, h);
-        TUI::new_tb(None, tb)
+        TUI::new_tb(None, tb, &[])
     }
 
     /// Get termbox front buffer. Useful for testing rendering.
@@ -134,16 +137,21 @@ impl TUI {
         self.msg_layout = layout
     }
 
-    pub(crate) fn current_tab(&self) -> &MsgSource {
-        &self.tabs[self.active_idx].src
+    pub(crate) fn current_tab(&self) -> Option<&MsgSource> {
+        self.tabs[self.active_idx].src.as_ref()
     }
 
-    fn new_tb(config_path: Option<PathBuf>, tb: Termbox) -> TUI {
+    fn new_tb(config_path: Option<PathBuf>, tb: Termbox, help_msgs: &[String]) -> TUI {
         // This is now done in reload_config() below
         // tb.set_clear_attributes(colors.clear.fg as u8, colors.clear.bg as u8);
 
         let width = tb.width() as i32;
         let height = tb.height() as i32;
+
+        let client_help = help_msgs
+            .iter()
+            .map(|s| s.to_string())
+            .collect::<Vec<String>>();
 
         let mut tui = TUI {
             tb,
@@ -156,6 +164,7 @@ impl TUI {
             height,
             h_scroll: 0,
             key_map: KeyMap::default(),
+            client_help,
             config_path,
         };
 
@@ -277,17 +286,18 @@ impl TUI {
                 CmdResult::Ok
             }
             Some("help") => {
-                self.add_client_msg("TUI Commands: ", &MsgTarget::CurrentTab);
-                for cmd in TUI_COMMANDS.iter() {
-                    self.add_client_msg(
-                        &format!(
-                            "/{:<10} - {:<25} - Usage: {}",
-                            cmd.name, cmd.description, cmd.usage
-                        ),
-                        &MsgTarget::CurrentTab,
-                    );
+                self.show_help();
+                CmdResult::Ok
+            }
+            Some("close") => {
+                // check if we're on help tab
+                let tab_idx = self.active_idx;
+                self.tabs.remove(tab_idx);
+                if self.active_idx == tab_idx {
+                    self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
                 }
-                // Fall through to print help for cmd.rs commands
+
+                self.fix_scroll_after_close();
                 CmdResult::Continue
             }
             Some("quit") => CmdResult::Quit,
@@ -335,13 +345,72 @@ impl TUI {
         self.colors = colors;
     }
 
+    fn show_help(&mut self) {
+        // Create a new tab
+        match self.find_tab_by_name("help") {
+            None => {
+                let idx = self.active_idx + 1;
+                self.new_tab(idx, None, false, Notifier::Off, "help".to_string());
+                self.select_tab(idx);
+
+                // TUI supports color codes
+                let green_color_code = "\x0303";
+
+                let mut help = vec![];
+
+                // Print help for client commands - already sorted
+                let mut client_help = vec![format!("{}{}", green_color_code, "Client Commands:")];
+                client_help.extend_from_slice(&self.client_help);
+                help.extend_from_slice(&client_help);
+
+                // Print help for TUI commands
+                let tui_header = format!("{}{}", green_color_code, "TUI Commands:");
+                let mut tui_help = TUI_COMMANDS
+                    .iter()
+                    .map(|cmd| {
+                        format!(
+                            "/{:<10} - {:<25} - Usage: {}",
+                            cmd.name, cmd.description, cmd.usage
+                        )
+                    })
+                    .collect::<Vec<_>>();
+                tui_help.sort();
+                help.push(tui_header);
+                help.extend_from_slice(&tui_help);
+
+                // add current keybindings
+                let bindings_header = format!("{}{}", green_color_code, "Key Bindings: ");
+                let mut keys = self
+                    .key_map
+                    .iter()
+                    .map(|(key, action)| format!("{:<20} - {:?}", format!("{:?}", action), key))
+                    .collect::<Vec<_>>();
+                keys.sort();
+                help.push(bindings_header);
+                help.extend_from_slice(&keys);
+
+                let target = MsgTarget::CurrentTab;
+                for msg in help {
+                    self.add_client_msg(&msg, &target);
+                }
+                self.tabs[idx]
+                    .widget
+                    .keypressed(KeyAction::MessagesScrollTop);
+            }
+            Some(idx) => {
+                // select tab since it's already created
+                self.select_tab(idx)
+            }
+        }
+    }
+
     fn new_tab(
         &mut self,
         idx: usize,
-        src: MsgSource,
+        src: Option<MsgSource>,
         status: bool,
         notifier: Notifier,
-        alias: Option<String>,
+        name: String,
     ) {
         let mut switch_keys: HashMap<char, i8> = HashMap::with_capacity(self.tabs.len());
         for tab in &self.tabs {
@@ -353,11 +422,8 @@ impl TUI {
         let switch = {
             let mut ret = None;
             let mut n = 0;
-            let visible_name = match alias.as_ref() {
-                None => src.visible_name(),
-                Some(alias) => alias,
-            };
-            for ch in visible_name.chars() {
+
+            for ch in name.chars() {
                 if !ch.is_alphabetic() {
                     continue;
                 }
@@ -380,7 +446,7 @@ impl TUI {
         self.tabs.insert(
             idx,
             Tab {
-                alias,
+                name: name.to_string(),
                 widget: MessagingUI::new(
                     self.width,
                     self.height - 1,
@@ -397,22 +463,24 @@ impl TUI {
     }
 
     /// Returns index of the new tab if a new tab is created.
-    pub fn new_server_tab(&mut self, serv: &str, alias: Option<String>) -> Option<usize> {
+    pub fn new_server_tab(&mut self, serv: &str, name: Option<String>) -> Option<usize> {
         match self.find_serv_tab_idx(serv) {
             None => {
                 let tab_idx = self.tabs.len();
+                let src = MsgSource::Serv {
+                    serv: serv.to_owned(),
+                };
+                let name = name.unwrap_or_else(|| src.visible_name().to_string());
                 self.new_tab(
                     tab_idx,
-                    MsgSource::Serv {
-                        serv: serv.to_owned(),
-                    },
+                    Some(src),
                     true,
                     if cfg!(feature = "desktop-notifications") {
                         Notifier::Mentions
                     } else {
                         Notifier::Off
                     },
-                    alias,
+                    name,
                 );
                 Some(tab_idx)
             }
@@ -423,7 +491,8 @@ impl TUI {
     /// Closes a server tab and all associated channel tabs.
     pub(crate) fn close_server_tab(&mut self, serv: &str) {
         if let Some(tab_idx) = self.find_serv_tab_idx(serv) {
-            self.tabs.retain(|tab: &Tab| tab.src.serv_name() != serv);
+            self.tabs
+                .retain(|tab: &Tab| tab.src.as_ref().map_or(true, |src| src.serv_name() == serv));
             if self.active_idx == tab_idx {
                 self.select_tab(if tab_idx == 0 { 0 } else { tab_idx - 1 });
             }
@@ -443,7 +512,7 @@ impl TUI {
                     let mut status_val: bool = true;
                     let mut notifier: Option<Notifier> = None;
                     for tab in &self.tabs {
-                        if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                        if let Some(MsgSource::Serv { serv: ref serv_ }) = tab.src {
                             if serv == serv_ {
                                 status_val = tab.widget.is_showing_status();
                                 notifier = Some(tab.notifier);
@@ -452,15 +521,17 @@ impl TUI {
                         }
                     }
                     let tab_idx = serv_tab_idx + 1;
+                    let src = MsgSource::Chan {
+                        serv: serv.to_owned(),
+                        chan: chan.to_owned(),
+                    };
+                    let name = src.visible_name().to_string();
                     self.new_tab(
                         tab_idx,
-                        MsgSource::Chan {
-                            serv: serv.to_owned(),
-                            chan: chan.to_owned(),
-                        },
+                        Some(src),
                         status_val,
                         notifier.expect("Creating a channel tab, but the server tab doesn't exist"),
-                        None,
+                        name,
                     );
                     if self.active_idx >= tab_idx {
                         self.next_tab();
@@ -494,16 +565,12 @@ impl TUI {
                     self.new_user_tab(serv, nick)
                 }
                 Some(tab_idx) => {
-                    self.new_tab(
-                        tab_idx + 1,
-                        MsgSource::User {
-                            serv: serv.to_owned(),
-                            nick: nick.to_owned(),
-                        },
-                        true,
-                        Notifier::Messages,
-                        None,
-                    );
+                    let src = MsgSource::User {
+                        serv: serv.to_owned(),
+                        nick: nick.to_owned(),
+                    };
+                    let name = src.visible_name().to_string();
+                    self.new_tab(tab_idx + 1, Some(src), true, Notifier::Messages, name);
                     if let Some(nick) = self.tabs[tab_idx].widget.get_nick() {
                         self.tabs[tab_idx + 1].widget.set_nick(nick);
                     }
@@ -555,7 +622,7 @@ impl TUI {
     pub(crate) fn handle_editor_result(
         &mut self,
         editor_ret: editor::Result<Vec<String>>,
-    ) -> Option<(Vec<String>, MsgSource)> {
+    ) -> Option<(Vec<String>, Option<MsgSource>)> {
         match editor_ret {
             Err(err) => {
                 self.handle_editor_err(err);
@@ -641,10 +708,16 @@ impl TUI {
             match self.tabs[self.active_idx].widget.keypressed(key_action) {
                 WidgetRet::KeyHandled => TUIRet::KeyHandled,
                 WidgetRet::KeyIgnored => self.handle_keypress(key, key_action, rcv_editor_ret),
-                WidgetRet::Input(input) => TUIRet::Input {
-                    msg: input,
-                    from: self.tabs[self.active_idx].src.clone(),
-                },
+                WidgetRet::Input(input) => {
+                    if let Some(src) = &self.tabs[self.active_idx].src {
+                        TUIRet::Input {
+                            msg: input,
+                            from: src.clone(),
+                        }
+                    } else {
+                        TUIRet::KeyIgnored(key)
+                    }
+                }
                 WidgetRet::Remove => unimplemented!(),
                 WidgetRet::Abort => TUIRet::Abort,
             }
@@ -970,21 +1043,27 @@ impl TUI {
         let mut next_idx = self.active_idx;
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
             match tab.src {
-                MsgSource::Serv { ref serv } => {
+                Some(MsgSource::Serv { ref serv }) => {
                     if serv.contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
                 }
-                MsgSource::Chan { ref chan, .. } => {
+                Some(MsgSource::Chan { ref chan, .. }) => {
                     // TODO: Case sensitive matching here is not ideal
                     if chan.display().contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
                 }
-                MsgSource::User { ref nick, .. } => {
+                Some(MsgSource::User { ref nick, .. }) => {
                     if nick.contains(string) {
+                        next_idx = tab_idx;
+                        break;
+                    }
+                }
+                _ => {
+                    if tab.name.contains(string) {
                         next_idx = tab_idx;
                         break;
                     }
@@ -1143,7 +1222,7 @@ impl TUI {
         match *target {
             MsgTarget::Server { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                    if let Some(MsgSource::Serv { serv: ref serv_ }) = tab.src {
                         if serv == serv_ {
                             target_idxs.push(tab_idx);
                             break;
@@ -1154,10 +1233,10 @@ impl TUI {
 
             MsgTarget::Chan { serv, chan } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if let MsgSource::Chan {
+                    if let Some(MsgSource::Chan {
                         serv: ref serv_,
                         chan: ref chan_,
-                    } = tab.src
+                    }) = tab.src
                     {
                         if serv == serv_ && chan == chan_ {
                             target_idxs.push(tab_idx);
@@ -1169,10 +1248,10 @@ impl TUI {
 
             MsgTarget::User { serv, nick } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if let MsgSource::User {
+                    if let Some(MsgSource::User {
                         serv: ref serv_,
                         nick: ref nick_,
-                    } = tab.src
+                    }) = tab.src
                     {
                         if serv == serv_ && nick == nick_ {
                             target_idxs.push(tab_idx);
@@ -1184,8 +1263,10 @@ impl TUI {
 
             MsgTarget::AllServTabs { serv } => {
                 for (tab_idx, tab) in self.tabs.iter().enumerate() {
-                    if tab.src.serv_name() == serv {
-                        target_idxs.push(tab_idx);
+                    if let Some(ref src) = tab.src {
+                        if src.serv_name() == serv {
+                            target_idxs.push(tab_idx);
+                        }
                     }
                 }
             }
@@ -1354,7 +1435,7 @@ impl TUI {
         if let MsgTarget::AllServTabs { serv } = *target {
             let mut status_val: bool = false;
             for tab in &self.tabs {
-                if let MsgSource::Serv { serv: ref serv_ } = tab.src {
+                if let Some(MsgSource::Serv { serv: ref serv_ }) = tab.src {
                     if serv == serv_ {
                         status_val = tab.widget.is_showing_status();
                         break;
@@ -1374,7 +1455,7 @@ impl TUI {
     // TODO: Maybe remove this and add a `create: bool` field to MsgTarget::User
     pub(crate) fn user_tab_exists(&self, serv_: &str, nick_: &str) -> bool {
         for tab in &self.tabs {
-            if let MsgSource::User { ref serv, ref nick } = tab.src {
+            if let Some(MsgSource::User { ref serv, ref nick }) = tab.src {
                 if serv_ == serv && nick_ == nick {
                     return true;
                 }
@@ -1405,7 +1486,7 @@ impl TUI {
 
     fn find_serv_tab_idx(&self, serv_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Serv { ref serv } = tab.src {
+            if let Some(MsgSource::Serv { ref serv }) = tab.src {
                 if serv_ == serv {
                     return Some(tab_idx);
                 }
@@ -1416,7 +1497,7 @@ impl TUI {
 
     fn find_chan_tab_idx(&self, serv_: &str, chan_: &ChanNameRef) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::Chan { ref serv, ref chan } = tab.src {
+            if let Some(MsgSource::Chan { ref serv, ref chan }) = tab.src {
                 if serv_ == serv && chan_ == chan {
                     return Some(tab_idx);
                 }
@@ -1427,7 +1508,7 @@ impl TUI {
 
     fn find_user_tab_idx(&self, serv_: &str, nick_: &str) -> Option<usize> {
         for (tab_idx, tab) in self.tabs.iter().enumerate() {
-            if let MsgSource::User { ref serv, ref nick } = tab.src {
+            if let Some(MsgSource::User { ref serv, ref nick }) = tab.src {
                 if serv_ == serv && nick_ == nick {
                     return Some(tab_idx);
                 }
@@ -1436,20 +1517,25 @@ impl TUI {
         None
     }
 
+    fn find_tab_by_name(&self, name: &str) -> Option<usize> {
+        self.tabs.iter().position(|tab| tab.name == name)
+    }
+
     /// Index of the last tab with the given server name.
     fn find_last_serv_tab_idx(&self, serv: &str) -> Option<usize> {
-        for (tab_idx, tab) in self.tabs.iter().enumerate().rev() {
-            if tab.src.serv_name() == serv {
-                return Some(tab_idx);
+        self.tabs.iter().rposition(|tab| {
+            if let Some(ref src) = tab.src {
+                src.serv_name() == serv
+            } else {
+                false
             }
-        }
-        None
+        })
     }
 
     fn is_server_tab(&self, idx: usize) -> bool {
         match self.tabs[idx].src {
-            MsgSource::Serv { .. } => true,
-            MsgSource::Chan { .. } | MsgSource::User { .. } => false,
+            Some(MsgSource::Serv { .. }) => true,
+            _ => false,
         }
     }
 

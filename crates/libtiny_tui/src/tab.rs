@@ -10,9 +10,9 @@ use crate::{
 };
 
 pub(crate) struct Tab {
-    pub(crate) alias: Option<String>,
+    pub(crate) name: String,
     pub(crate) widget: MessagingUI,
-    pub(crate) src: MsgSource,
+    pub(crate) src: Option<MsgSource>,
     pub(crate) style: TabStyle,
     /// Alt-character to use to switch to this tab.
     pub(crate) switch: Option<char>,
@@ -29,13 +29,6 @@ fn tab_style(style: TabStyle, colors: &Colors) -> Style {
 }
 
 impl Tab {
-    pub(crate) fn visible_name(&self) -> &str {
-        match self.alias {
-            Some(ref alias) => alias,
-            None => self.src.visible_name(),
-        }
-    }
-
     pub(crate) fn set_style(&mut self, style: TabStyle) {
         self.style = style;
     }
@@ -44,11 +37,13 @@ impl Tab {
     where
         F: Fn(&mut MsgSource),
     {
-        f(&mut self.src)
+        if let Some(ref mut src) = self.src {
+            f(src)
+        }
     }
 
     pub(crate) fn width(&self) -> i32 {
-        self.visible_name().width() as i32
+        self.name.width() as i32
     }
 
     pub(crate) fn draw(
@@ -66,7 +61,7 @@ impl Tab {
         };
 
         let mut switch_drawn = false;
-        for ch in self.visible_name().chars() {
+        for ch in self.name.chars() {
             if Some(ch) == self.switch && !switch_drawn {
                 tb.change_cell(pos_x, pos_y, ch, style.fg | TB_UNDERLINE, style.bg);
                 switch_drawn = true;

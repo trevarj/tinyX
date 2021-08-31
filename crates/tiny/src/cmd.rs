@@ -95,7 +95,7 @@ fn find_client<'a>(clients: &'a mut Vec<Client>, serv_name: &str) -> Option<&'a 
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-static CMDS: [&Cmd; 9] = [
+static CMDS: [&Cmd; 8] = [
     &AWAY_CMD,
     &CLOSE_CMD,
     &CONNECT_CMD,
@@ -104,7 +104,6 @@ static CMDS: [&Cmd; 9] = [
     &MSG_CMD,
     &NAMES_CMD,
     &NICK_CMD,
-    &HELP_CMD,
 ];
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -509,25 +508,18 @@ fn nick(args: CmdArgs) {
     }
 }
 
-static HELP_CMD: Cmd = Cmd {
-    name: "help",
-    cmd_fn: help,
-    description: "Displays this message",
-    usage: "`/help`",
-};
-
-fn help(args: CmdArgs) {
-    let CmdArgs { ui, .. } = args;
-    ui.add_client_msg("Client Commands:", &MsgTarget::CurrentTab);
-    for cmd in CMDS.iter() {
-        ui.add_client_msg(
-            &format!(
+pub(crate) fn help_msgs() -> Vec<String> {
+    let mut msgs = CMDS
+        .iter()
+        .map(|cmd| {
+            format!(
                 "/{:<10} - {:<25} - Usage: {}",
                 cmd.name, cmd.description, cmd.usage
-            ),
-            &MsgTarget::CurrentTab,
-        )
-    }
+            )
+        })
+        .collect::<Vec<_>>();
+    msgs.sort();
+    msgs
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

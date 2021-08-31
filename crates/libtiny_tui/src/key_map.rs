@@ -152,6 +152,10 @@ impl KeyMap {
     pub(crate) fn load(&mut self, key_map: &KeyMap) {
         self.0.extend(key_map.0.iter())
     }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = (&Key, &KeyAction)> {
+        self.0.iter()
+    }
 }
 
 impl<'de> Deserialize<'de> for KeyMap {
