@@ -1,11 +1,9 @@
-# tiny - Yet another terminal IRC client
+# tinyX - IRC client
 
-tiny is an IRC client written in Rust.
+tinyX is an experimental (unstable) fork of the [tiny IRC client](https://github.com/osa1/tiny) written in Rust.
 
 <p float="left" align="middle">
-  <img src="/assets/tiny.png" width="430" />
-  <img src="/assets/tiny_mac.png" width="430" />
-  <img src="https://user-images.githubusercontent.com/448274/73597059-47e71380-4539-11ea-844d-0ec260691911.png" width="430" />
+  <img src="assets/tinyX.png" width="720" />
 </p>
 
 ## Features
