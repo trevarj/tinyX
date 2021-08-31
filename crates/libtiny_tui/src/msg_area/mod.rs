@@ -6,7 +6,6 @@ use termbox_simple::Termbox;
 
 pub(crate) use self::line::{Line, SegStyle};
 use crate::config::Colors;
-use crate::line_split::LineType;
 use crate::messaging::{Timestamp, MSG_NICK_SUFFIX_LEN};
 
 pub(crate) struct MsgArea {
@@ -36,7 +35,7 @@ pub(crate) enum Layout {
 }
 
 impl Layout {
-    fn msg_padding(&self) -> usize {
+    pub(crate) fn msg_padding(&self) -> usize {
         match self {
             Layout::Compact => 0,
             Layout::Aligned { max_nick_len } => {
@@ -82,14 +81,17 @@ impl MsgArea {
         self.total_visible_lines();
     }
 
-    pub(crate) fn layout(&self) -> Layout {
-        self.layout
-    }
-
     /// Used to force a line to be aligned.
     pub(crate) fn set_current_line_alignment(&mut self) {
-        let msg_padding = self.layout.msg_padding();
-        self.line_buf.set_type(LineType::AlignedMsg { msg_padding });
+        self.line_buf.set_can_align(true);
+        self.line_buf.set_type(self.layout.into());
+    }
+
+    pub(crate) fn set_layout(&mut self, layout: Layout) {
+        self.layout = layout;
+        self.lines
+            .iter_mut()
+            .for_each(|line| line.set_type(layout.into()));
     }
 
     pub(crate) fn draw(&mut self, tb: &mut Termbox, colors: &Colors, pos_x: i32, pos_y: i32) {
