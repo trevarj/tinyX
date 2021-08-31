@@ -15,10 +15,10 @@ pub(crate) fn draw(
     }
 
     // Calculate where the scrollbar is
-    let lines = lines as f32;
-    let scroll = scroll as f32;
     let page_size = height as f32;
-    let bar_pos = (((lines - scroll) / lines) * page_size) - 1f32;
+    let lines = lines as f32 - page_size;
+    let scroll = scroll as f32;
+    let bar_pos = ((lines - scroll) / lines) * page_size;
 
     for y in 0..height {
         let fg = if y == bar_pos as i32 {
