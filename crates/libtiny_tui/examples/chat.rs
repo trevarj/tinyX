@@ -2,6 +2,7 @@
 
 use libtiny_common::{ChanNameRef, Event, MsgTarget};
 use libtiny_tui::TUI;
+use time::Duration;
 
 use std::fs::File;
 use std::io::Read;
@@ -34,7 +35,7 @@ fn main() {
         tui.new_chan_tab("debug", ChanNameRef::new("chan"));
         tui.set_topic(
             "This is channel topic",
-            time::now(),
+            time::now() - Duration::minutes(1),
             SERV,
             ChanNameRef::new(CHAN),
         );
@@ -52,6 +53,14 @@ fn main() {
                 tui.add_privmsg(&nick, line, now, &chan_target, false, false);
             }
         }
+
+        tui.rename_nick("nick_23", "mj", time::now(), &chan_target);
+        tui.rename_nick(
+            "nick_24",
+            "kobe",
+            time::now() + Duration::minutes(1),
+            &chan_target,
+        );
 
         tui.set_nick(SERV, "some_long_nick_name____");
         tui.draw();

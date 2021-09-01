@@ -416,7 +416,7 @@ fn test_join_part_overflow() {
 
 #[test]
 fn test_alignment_long_string() {
-    let mut tui = TUI::new_test(40, 5);
+    let mut tui = TUI::new_test(40, 6);
     tui.set_layout(Layout::Aligned { max_nick_len: 12 });
     let serv = "irc.server_1.org";
     let chan = ChanNameRef::new("#chan");
@@ -441,14 +441,17 @@ fn test_alignment_long_string() {
     #[rustfmt::skip]
     let screen =
         "|                                        |
+         |                                        |
          |00:00         osa1: 12345678901234567890|
          |                    1234567890          |
          |osa1:                                   |
          |mentions irc.server_1.org #chan         |";
 
-    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
 
     tui.add_privmsg("veryverylongnickname", "hi", ts, &target, false, false);
+    let ts = time::at_utc(time::Timespec::new(60, 0));
+    tui.rename_nick("mr", "mrs", ts, &target);
     tui.draw();
 
     #[rustfmt::skip]
@@ -456,10 +459,11 @@ fn test_alignment_long_string() {
         "|00:00         osa1: 12345678901234567890|
          |                    1234567890          |
          |      veryverylon…: hi                  |
+         |00:01               mr>mrs              |
          |osa1:                                   |
          |mentions irc.server_1.org #chan         |";
 
-    expect_screen(screen, &tui.get_front_buffer(), 40, 5, Location::caller());
+    expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
 }
 #[test]
 fn test_resize() {

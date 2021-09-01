@@ -61,7 +61,7 @@ log_dir: "{}"
 # scrollback: 512
 
 # (Optional) UI layout: 'compact' or 'aligned'. Defaults to 'compact'.
-# layout: compact
+layout: aligned
 
 # (Optional) Nick length in 'aligned' layout. Default is 12.
 # max_nick_length: 12
