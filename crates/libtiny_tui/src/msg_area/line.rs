@@ -249,6 +249,7 @@ impl Line {
     /// Returns Vec of modified segments or extra padding segments
     fn padding(&self) -> Vec<StyledString> {
         if let Some(msg_padding) = self.line_type().msg_padding() {
+            eprintln!("{:?}", self.segments);
             match self.segments.get(..2) {
                 Some([first, second]) => {
                     match (first.style, second.style) {
@@ -263,8 +264,8 @@ impl Line {
                             let padded = align(second, msg_padding - Timestamp::WIDTH);
                             return vec![first.clone(), padded];
                         }
-                        (SegStyle::Faded, _) => {
-                            // full padding needed on NickChange
+                        (SegStyle::Faded, _) | (SegStyle::Join, _) | (SegStyle::Part, _) => {
+                            // full padding on multiple NickChange or Join/Part with no timestamp
                             let padded = align(first, msg_padding);
                             return vec![padded, second.clone()];
                         }
@@ -281,10 +282,9 @@ impl Line {
                 _ => {
                     match self.segments.get(0) {
                         Some(first) => {
-                            // full padding needed on Join/Part without timestamp
-                            let mut pad = StyledString::default();
-                            pad.string = " ".repeat(msg_padding);
-                            return vec![pad, first.clone()];
+                            // full padding on single Join/Part without timestamp
+                            let padded = align(first, msg_padding);
+                            return vec![padded.clone()];
                         }
                         None => {}
                     }

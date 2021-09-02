@@ -54,13 +54,17 @@ fn main() {
             }
         }
 
+        let now = time::now() + Duration::minutes(1);
         tui.rename_nick("nick_23", "mj", time::now(), &chan_target);
-        tui.rename_nick(
-            "nick_24",
-            "kobe",
-            time::now() + Duration::minutes(1),
-            &chan_target,
-        );
+        tui.rename_nick("nick_24", "kobe", now, &chan_target);
+
+        tui.add_privmsg("mj", "bye", now, &chan_target, false, false);
+        tui.remove_nick("mj", Some(now), &chan_target);
+        tui.add_nick("mj", Some(now), &chan_target);
+
+        let now = time::now() + Duration::minutes(2);
+        tui.add_nick("guy", Some(now), &chan_target);
+        tui.remove_nick("guy", Some(now), &chan_target);
 
         tui.set_nick(SERV, "some_long_nick_name____");
         tui.draw();
