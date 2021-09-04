@@ -552,7 +552,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 ui.set_topic(topic, time::now(), serv, ChanNameRef::new(chan));
                 }
                 // RPL_NAMREPLY: List of users in a channel
-                (353, 3) => {
+                (353, n_params) if n_params > 3 => {
                     let chan = &params[2];
                     let chan_target = MsgTarget::Chan {
                         serv,
@@ -571,13 +571,13 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     ui.add_client_msg(msg, &MsgTarget::AllServTabs { serv });
                 }
                 // ERR_NOSUCHNICK
-                (401, 3) => {
+                (401, n_params) if n_params > 2 => {
                     let nick = &params[1];
                     let msg = &params[2];
                     ui.add_client_msg(msg, &MsgTarget::User { serv, nick });
                 }
                 // RPL_AWAY
-                (301, 3) => {
+                (301, n_params) if n_params > 2 => {
                     let nick = &params[1];
                     let msg = &params[2];
                     ui.add_client_msg(
@@ -586,7 +586,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                     );
                 }
                 // ERR_BADCHANNAME
-                (479, 3)  => {
+                (479, n_params) if n_params > 2  => {
                     let chan = &params[1];
                     let msg = &params[2];
                     ui.add_client_err_msg(
@@ -600,7 +600,7 @@ fn handle_irc_msg(ui: &UI, client: &dyn Client, msg: wire::Msg) {
                 // ERR_BADCHANNELKEY    475
                 // ERR_NEEDREGGEDNICK   477
                 // ERR_THROTTLE         480
-                (471 | 473 | 474 | 475 | 477 | 480, 3) => {
+                (471 | 473 | 474 | 475 | 477 | 480, n_params) if n_params > 2 => {
                     let chan = &params[1];
                     let msg = &params[2];
                     ui.add_client_err_msg(
