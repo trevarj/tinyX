@@ -465,6 +465,7 @@ fn test_alignment_long_string() {
 
     expect_screen(screen, &tui.get_front_buffer(), 40, 6, Location::caller());
 }
+
 #[test]
 fn test_resize() {
     let mut tui = TUI::new_test(80, 50);
@@ -510,4 +511,49 @@ fn test_resize() {
         tui.set_size(w, h);
         tui.draw();
     }
+}
+
+// Test for when scrollbar appears
+#[test]
+fn test_scrollbar() {
+    let mut tui = TUI::new_test(28, 6);
+    tui.set_layout(Layout::Aligned { max_nick_len: 10 });
+    tui.new_server_tab("s", None);
+    tui.next_tab();
+    let target = MsgTarget::CurrentTab;
+    let ts = time::at_utc(time::Timespec::new(0, 0));
+
+    for _ in 0..3 {
+        let msg = "1111 11111 1111 1111 11111 11111 111";
+        tui.add_privmsg("x", &msg, ts, &target, false, false);
+    }
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|               x: 1111 11111|
+         |                  1111 1111 |
+         |                  11111     |
+         |                  11111 111 |
+         |                            |
+         |mentions s                  |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 28, 6, Location::caller());
+
+    let event = term_input::Event::Key(Key::Home);
+    tui.handle_input_event(event, &mut None);
+
+    tui.draw();
+
+    #[rustfmt::skip]
+    let screen =
+        "|00:00          x: 1111     ||
+         |                  11111    ||
+         |                  1111 1111||
+         |                  11111    ||
+         |                            |
+         |mentions s                  |";
+
+    expect_screen(screen, &tui.get_front_buffer(), 28, 6, Location::caller());
 }
