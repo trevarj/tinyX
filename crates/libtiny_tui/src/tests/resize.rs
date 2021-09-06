@@ -36,7 +36,7 @@ fn test_resize_recalc_scroll() {
     #[rustfmt::skip]
     let screen1 =
        "|1111 1111 1111 |
-        |1111 1111 1111 |
+        |1111 1111      |
         |1111 e         |
         |               |
         |< #chan        |";

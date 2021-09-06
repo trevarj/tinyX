@@ -27,8 +27,8 @@ fn init_screen() {
 
     #[rustfmt::skip]
     let screen =
-        "|Any mentions to you |
-         |will be listed here.|
+        "|will be listed      |
+         |here.               |
          |                    |
          |mentions            |";
     expect_screen(screen, &tui.get_front_buffer(), 20, 4, Location::caller());
@@ -71,8 +71,8 @@ fn close_rightmost_tab() {
 
     #[rustfmt::skip]
     let screen =
-        "|Any mentions to you |
-         |will be listed here.|
+        "|will be listed      |
+         |here.               |
          |                    |
          |mentions            |";
     expect_screen(screen, &tui.get_front_buffer(), 20, 4, Location::caller());
@@ -91,14 +91,14 @@ fn small_screen_1() {
 
     let target = MsgTarget::Chan { serv, chan };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_nick("123456", Some(ts), &target);
-    tui.add_nick("abcdef", Some(ts), &target);
+    tui.add_nick("12345", Some(ts), &target);
+    tui.add_nick("abcde", Some(ts), &target);
 
     tui.draw();
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 +123456 +abcdef|
+        "|00:00 +12345 +abcde  |
          |osa1:                |
          |< #chan              |";
 
@@ -109,7 +109,7 @@ fn small_screen_1() {
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 +123456 +abcdef   |
+        "|00:00 +12345 +abcde     |
          |osa1:                   |
          |< irc.server_1.org #chan|";
 
@@ -120,7 +120,7 @@ fn small_screen_1() {
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 +123456 +abcdef          |
+        "|00:00 +12345 +abcde            |
          |osa1:                          |
          |mentions irc.server_1.org #chan|";
 
@@ -140,14 +140,14 @@ fn small_screen_2() {
 
     let target = MsgTarget::Chan { serv, chan };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.set_topic("Blah blah blah-", ts.clone(), serv, chan);
+    tui.set_topic("Blah blah blah", ts.clone(), serv, chan);
 
     tui.draw();
 
     #[rustfmt::skip]
     let screen =
         "|                     |
-         |00:00 Blah blah blah-|
+         |00:00 Blah blah blah |
          |osa1:                |
          |< #chan              |";
     expect_screen(screen, &tui.get_front_buffer(), 21, 4, Location::caller());
@@ -157,7 +157,7 @@ fn small_screen_2() {
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 Blah blah blah-|
+        "|00:00 Blah blah blah |
          |+123456              |
          |osa1:                |
          |< #chan              |";
@@ -399,15 +399,15 @@ fn test_join_part_overflow() {
 
     let target = MsgTarget::Chan { serv, chan };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_nick("123456", Some(ts), &target);
-    tui.add_nick("abcdef", Some(ts), &target);
-    tui.add_nick("hijklm", Some(ts), &target);
+    tui.add_nick("12345", Some(ts), &target);
+    tui.add_nick("abcde", Some(ts), &target);
+    tui.add_nick("hijkl", Some(ts), &target);
     tui.draw();
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 +123456 +abcdef|
-         |+hijklm              |
+        "|00:00 +12345 +abcde  |
+         |+hijkl               |
          |osa1:                |
          |< #chan              |";
 
@@ -442,8 +442,8 @@ fn test_alignment_long_string() {
     let screen =
         "|                                        |
          |                                        |
-         |00:00         osa1: 12345678901234567890|
-         |                    1234567890          |
+         |00:00         osa1: 1234567890123456789 |
+         |                    01234567890         |
          |osa1:                                   |
          |mentions irc.server_1.org #chan         |";
 
@@ -456,8 +456,8 @@ fn test_alignment_long_string() {
 
     #[rustfmt::skip]
     let screen =
-        "|00:00         osa1: 12345678901234567890|
-         |                    1234567890          |
+        "|00:00         osa1: 1234567890123456789 |
+         |                    01234567890         |
          |      veryverylon…: hi                  |
          |00:01               mr>mrs              |
          |osa1:                                   |
@@ -532,7 +532,7 @@ fn test_scrollbar() {
 
     #[rustfmt::skip]
     let screen =
-        "|               x: 1111 11111|
+        "|                  11111     |
          |                  1111 1111 |
          |                  11111     |
          |                  11111 111 |

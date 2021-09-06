@@ -192,12 +192,7 @@ impl MessagingUI {
             .resize(width, get_input_field_max_height(height));
         // msg_area should resize based on input_field's rendered height
         let msg_area_height = height - self.input_field.get_height(width);
-        let msg_area_width = if self.msg_area.has_scrollbar() {
-            width - 1
-        } else {
-            width
-        };
-        self.msg_area.resize(msg_area_width, msg_area_height);
+        self.msg_area.resize(width, msg_area_height);
 
         // We don't show the nick in exit dialogue, so it has the full width
         for exit_dialogue in &mut self.exit_dialogue {

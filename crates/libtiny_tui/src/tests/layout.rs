@@ -19,15 +19,15 @@ fn test_join_part_overflow() {
 
     let target = MsgTarget::Chan { serv, chan };
     let ts = time::at_utc(time::Timespec::new(0, 0));
-    tui.add_nick("123456", Some(ts), &target);
-    tui.add_nick("abcdef", Some(ts), &target);
-    tui.add_nick("hijklm", Some(ts), &target);
+    tui.add_nick("12345", Some(ts), &target);
+    tui.add_nick("abcde", Some(ts), &target);
+    tui.add_nick("hijkl", Some(ts), &target);
     tui.draw();
 
     #[rustfmt::skip]
     let screen =
-        "|00:00 +123456 +abcdef|
-         |+hijklm              |
+        "|00:00 +12345 +abcde  |
+         |+hijkl               |
          |osa1:                |
          |< #chan              |";
 
@@ -50,7 +50,7 @@ fn test_alignment_long_string() {
     let ts = time::at_utc(time::Timespec::new(0, 0));
     tui.add_privmsg(
         "osa1",
-        "123456789012345678901234567890",
+        "12345678901234567890123456789",
         ts,
         &target,
         false,
@@ -61,8 +61,8 @@ fn test_alignment_long_string() {
     #[rustfmt::skip]
     let screen =
         "|                                        |
-         |00:00         osa1: 12345678901234567890|
-         |                    1234567890          |
+         |00:00         osa1: 1234567890123456789 |
+         |                    0123456789          |
          |osa1:                                   |
          |mentions irc.server_1.org #chan         |";
 

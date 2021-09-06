@@ -53,7 +53,7 @@ impl MsgArea {
         MsgArea {
             lines: VecDeque::with_capacity(512.min(scrollback)),
             scrollback,
-            width,
+            width: width - 1,
             height,
             scroll: 0,
             line_buf: Line::new(),
@@ -67,7 +67,7 @@ impl MsgArea {
     }
 
     pub(crate) fn resize(&mut self, width: i32, height: i32) {
-        self.width = width;
+        self.width = width - 1;
         let old_height = self.height;
         self.height = height;
         let old_total_lines = self.lines_height;
@@ -160,41 +160,25 @@ impl MsgArea {
         }
     }
 
-    pub(crate) fn has_scrollbar(&self) -> bool {
-        self.scroll != 0
-    }
-
     // The following functions resize MsgArea when the scrollbar appears/disappears
 
     pub(crate) fn scroll_up(&mut self) {
-        if self.scroll == 0 {
-            self.resize(self.width - 1, self.height);
-        }
         if self.scroll < max(0, self.total_visible_lines() - self.height) {
             self.scroll += 1;
         }
     }
 
     pub(crate) fn scroll_down(&mut self) {
-        if self.scroll == 1 {
-            self.resize(self.width + 1, self.height);
-        }
         if self.scroll > 0 {
             self.scroll -= 1;
         }
     }
 
     pub(crate) fn scroll_top(&mut self) {
-        if self.scroll == 0 {
-            self.resize(self.width - 1, self.height);
-        }
         self.scroll = max(0, self.total_visible_lines() - self.height);
     }
 
     pub(crate) fn scroll_bottom(&mut self) {
-        if self.scroll > 0 {
-            self.resize(self.width + 1, self.height);
-        }
         self.scroll = 0;
     }
 
@@ -205,9 +189,7 @@ impl MsgArea {
     }
 
     pub(crate) fn page_down(&mut self) {
-        for _ in 0..10 {
-            self.scroll_down();
-        }
+        self.scroll = max(0, self.scroll - 10);
     }
 
     /// Recalculate the scroll offset due to resizing of the window
