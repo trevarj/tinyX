@@ -5,9 +5,19 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Deserialize, Debug, PartialEq, Eq)]
-pub(crate) struct SASLAuth {
-    pub(crate) username: String,
-    pub(crate) password: String,
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SASLAuth {
+    Plain {
+        /// Registered username
+        username: String,
+        /// Password
+        password: String,
+    },
+    External {
+        /// Path to PEM file with private key and certificate (PKCS12 format).
+        /// A fingerprint of the certificate should be registered with NickServ
+        pem: PathBuf,
+    },
 }
 
 #[derive(Clone, Deserialize)]
