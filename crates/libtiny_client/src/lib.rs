@@ -64,10 +64,20 @@ pub struct ServerInfo {
 }
 
 /// SASL authentication mechanisms
+/// https://ircv3.net/docs/sasl-mechs
+/// https://www.alphachat.net/sasl.xhtml
 #[derive(Debug, Clone)]
 pub enum SASLAuth {
-    Plain { username: String, password: String },
+    Plain {
+        username: String,
+        password: String,
+    },
     External(SASLExternal),
+    /// ECDSA-NIST256P-CHALLENGE
+    Ecdsa {
+        /// ECDSA p256 private key sec1 PEM
+        key: String,
+    },
 }
 
 #[derive(Debug, Clone)]

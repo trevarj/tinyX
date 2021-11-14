@@ -9,15 +9,20 @@ edition = "2018"
 default = ["tls-rustls"]
 tls-native = ["native-tls", "tokio-native-tls"]
 tls-rustls = ["rustls-native-certs", "tokio-rustls"]
+sasl-ecdsa = ["p256", "sec1", "ecdsa"]
 
 [dependencies]
 base64 = "0.13"
+ecdsa = { version = "0.12", optional = true, features = ["sign", "verify", "dev"] }
 futures-util = { version = "0.3", default-features = false }
 lazy_static = "1.4"
 libtiny_common = { path = "../libtiny_common" }
 libtiny_wire = { path = "../libtiny_wire" }
 log = "0.4"
 native-tls = { version = "0.2", optional = true }
+p256 = { version = "0.9", optional = true, features = ["sha2"] }
+rand = "0.8"
+sec1 = { version = "0.1", optional = true, features = ["pem"] }
 rustls-native-certs = { version = "0.6", optional = true }
 tokio = { version = "1.6.1", default-features = false, features = ["net", "rt", "io-util", "macros"] }
 tokio-native-tls = { version = "0.3", optional = true }

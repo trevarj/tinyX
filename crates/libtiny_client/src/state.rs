@@ -627,6 +627,7 @@ impl StateInner {
                                 let msg = match sasl {
                                     SASLAuth::Plain { .. } => "PLAIN",
                                     SASLAuth::External(_) => "EXTERNAL",
+                                    SASLAuth::Ecdsa { .. } => "ECDSA-NIST256P-CHALLENGE",
                                 };
                                 snd_irc_msg.try_send(wire::authenticate(msg)).unwrap();
                             } else {
@@ -652,16 +653,40 @@ impl StateInner {
                 if param.as_str() == "+" {
                     // Empty AUTHENTICATE response; server accepted the specified SASL mechanism
                     if let Some(ref auth) = self.server_info.sasl_auth {
+                        let msg = match auth {
+                            SASLAuth::Plain { username, password } => base64::encode(format!(
+                                "{}\x00{}\x00{}",
+                                username, username, password
+                            )),
+                            SASLAuth::External { .. } => "+".to_string(),
+                            SASLAuth::Ecdsa { .. } => {
+                                //  send "username" + '\0' + "username"
+                                base64::encode(format!("{0}\x00{0}", self.current_nick))
+                            }
+                        };
+                        snd_irc_msg.try_send(wire::authenticate(&msg)).unwrap();
+                    }
+                } else {
+                    if let Some(ref auth) = self.server_info.sasl_auth {
                         match auth {
-                            SASLAuth::Plain { username, password } => {
-                                let msg = format!("{}\x00{}\x00{}", username, username, password);
-                                snd_irc_msg
-                                    .try_send(wire::authenticate(&base64::encode(&msg)))
-                                    .unwrap();
+                            #[cfg(feature = "sasl-ecdsa")]
+                            SASLAuth::Ecdsa { key } => {
+                                use p256::ecdsa::signature::Signer;
+                                // decode challege
+                                let challenge = base64::decode(param).unwrap();
+
+                                // construct private key
+                                let sec1_doc: sec1::EcPrivateKeyDocument = key.parse().unwrap();
+                                let ec_key = sec1_doc.private_key().private_key;
+                                let privkey = p256::ecdsa::SigningKey::from_bytes(ec_key).unwrap();
+
+                                // sign challenge
+                                let sig = privkey.try_sign(&challenge).unwrap().to_der();
+                                let answer = base64::encode(sig.as_bytes());
+
+                                snd_irc_msg.try_send(wire::authenticate(&answer)).unwrap();
                             }
-                            SASLAuth::External { .. } => {
-                                snd_irc_msg.try_send(wire::authenticate("+")).unwrap()
-                            }
+                            _ => {}
                         }
                     }
                 }

@@ -12,6 +12,7 @@ edition = "2018"
 default = ["tls-rustls"]
 tls-native = ["libtiny_client/tls-native"]
 tls-rustls = ["libtiny_client/tls-rustls"]
+sasl-ecdsa = ["libtiny_client/sasl-ecdsa"]
 desktop-notifications = ["libtiny_tui/desktop-notifications"]
 
 [dependencies]

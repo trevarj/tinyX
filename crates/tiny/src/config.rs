@@ -18,6 +18,11 @@ pub(crate) enum SASLAuth {
         /// A fingerprint of the certificate should be registered with NickServ
         pem: PathBuf,
     },
+    #[serde(rename = "ecdsa_nist256p_challenge")]
+    Ecdsa {
+        /// Path to p256 private key
+        key: PathBuf,
+    },
 }
 
 #[derive(Clone, Deserialize)]

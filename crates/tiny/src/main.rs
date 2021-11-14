@@ -229,5 +229,27 @@ fn sasl_from_config(tls: bool, sasl_config: &config::SASLAuth) -> Result<SASLAut
                 }
             }
         }
+        config::SASLAuth::Ecdsa { key } => {
+            #[cfg(feature = "sasl-ecdsa")]
+            {
+                use std::io::Read;
+                // load private key from pem
+                match File::open(key) {
+                    Ok(mut file) => {
+                        let mut buf = String::new();
+                        file.read_to_string(&mut buf)
+                            .map_err(|e| format!("Could not read SASL ECDSA key file: {}", e))?;
+
+                        Ok(SASLAuth::Ecdsa { key: buf })
+                    }
+                    Err(e) => Err(format!("Could not read SASL ECDSA key file: {}", e)),
+                }
+            }
+            #[cfg(not(feature = "sasl-ecdsa"))]
+            {
+                let _ = key;
+                Err("SASL ECDSA-NIST256P-CHALLENGE is disabled in this build".to_string())
+            }
+        }
     }
 }
