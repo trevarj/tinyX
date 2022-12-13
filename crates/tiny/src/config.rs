@@ -1,9 +1,10 @@
-use serde::Deserialize;
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use serde::Deserialize;
 
 #[derive(Clone, Deserialize, Debug)]
 pub(crate) struct SASLAuth<P> {
@@ -12,6 +13,7 @@ pub(crate) struct SASLAuth<P> {
 }
 
 #[derive(Clone, Deserialize)]
+#[serde(bound(deserialize = "P: Deserialize<'de>"))]
 pub(crate) struct Server<P> {
     /// Address of the server
     pub(crate) addr: String,
@@ -47,7 +49,7 @@ pub(crate) struct Server<P> {
     pub(crate) nickserv_ident: Option<P>,
 
     /// Authenication method
-    #[serde(rename = "sasl")]
+    #[serde(default, rename = "sasl")]
     pub(crate) sasl_auth: Option<SASLAuth<P>>,
 }
 
@@ -62,9 +64,9 @@ pub(crate) struct Defaults {
     pub(crate) tls: bool,
 }
 
-// TODO FIXME: I don't understand why we need `Default` bound here on `P`
 #[derive(Deserialize)]
-pub(crate) struct Config<P: Default> {
+pub(crate) struct Config<P> {
+    #[serde(bound(deserialize = "P: Deserialize<'de>",))]
     pub(crate) servers: Vec<Server<P>>,
     pub(crate) defaults: Defaults,
     pub(crate) log_dir: Option<PathBuf>,
@@ -86,14 +88,6 @@ impl PassOrCmd {
             PassOrCmd::Cmd(cmd) => cmd.is_empty(),
             PassOrCmd::Pass(_) => false,
         }
-    }
-}
-
-impl Default for PassOrCmd {
-    fn default() -> Self {
-        // HACK FIXME TODO - For some reason we need `Default` for `PassOrCmd` to be able to
-        // deserialize `Config`. No idea why.
-        panic!("default() called for PassOrCmd");
     }
 }
 
